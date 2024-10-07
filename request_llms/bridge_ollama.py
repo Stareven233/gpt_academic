@@ -256,8 +256,9 @@ def generate_payload(inputs, llm_kwargs, history, system_prompt, stream):
     what_i_ask_now["content"] = inputs
     messages.append(what_i_ask_now)
     model = llm_kwargs['llm_model']
-    if llm_kwargs['llm_model'].startswith('ollama-'):
-        model = llm_kwargs['llm_model'][len('ollama-'):]
+    if model.startswith('ollama@'):
+        # 默认格式为：ollama@localhost-llama3.1:8b-instruct-q6_K，"-"之后是模型名称
+        model = model[model.find('-')+1:]
         model, _ = read_one_api_model_name(model)
     options = {"temperature": llm_kwargs['temperature']}
     payload = {
@@ -266,4 +267,4 @@ def generate_payload(inputs, llm_kwargs, history, system_prompt, stream):
         "options": options,
     }
 
-    return headers,payload
+    return headers, payload

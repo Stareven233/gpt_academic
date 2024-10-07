@@ -143,7 +143,10 @@ class LatexPaperSplit():
             else:
                 # match \begin{abstract}xxxx\end{abstract}
                 position = match.end()
-            result_string = result_string[:position] + self.msg + msg + self.msg_declare + result_string[position:]
+                
+            msg: str = self.msg + msg + self.msg_declare
+            msg = re.sub(r'(?<!\\)_', r'\_', msg)
+            result_string = result_string[:position] + msg + result_string[position:]
         return result_string
 
 

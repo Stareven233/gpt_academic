@@ -1067,11 +1067,11 @@ for model in [m for m in AVAIL_LLM_MODELS if m.startswith("vllm-")]:
         },
     })
 # -=-=-=-=-=-=- ollama 对齐支持 -=-=-=-=-=-=-
-for model in [m for m in AVAIL_LLM_MODELS if m.startswith("ollama-")]:
+if any(m.startswith("ollama@") for m in AVAIL_LLM_MODELS):
     from .bridge_ollama import predict_no_ui_long_connection as ollama_noui
     from .bridge_ollama import predict as ollama_ui
-    break
-for model in [m for m in AVAIL_LLM_MODELS if m.startswith("ollama-")]:
+    endpoint_pattern = re.compile(r"ollama@(\w?[\w\.]*[0-9a-zA-Z])-")
+for model in filter(lambda m: m.startswith("ollama@"), AVAIL_LLM_MODELS):
     # 为了更灵活地接入ollama多模型管理界面，设计了此接口，例子：AVAIL_LLM_MODELS = ["ollama-phi3(max_token=6666)"]
     # 其中
     #   "ollama-"           是前缀（必要）
@@ -1082,11 +1082,12 @@ for model in [m for m in AVAIL_LLM_MODELS if m.startswith("ollama-")]:
     except:
         logger.error(f"ollama模型 {model} 的 max_token 配置不是整数，请检查配置文件。")
         continue
+    e = endpoint_pattern.match(model).group(1)
     model_info.update({
         model: {
             "fn_with_ui": ollama_ui,
             "fn_without_ui": ollama_noui,
-            "endpoint": ollama_endpoint,
+            "endpoint": ollama_endpoint.replace("localhost", e),
             "max_token": max_token_tmp,
             "tokenizer": tokenizer_gpt35,
             "token_cnt": get_token_num_gpt35,
