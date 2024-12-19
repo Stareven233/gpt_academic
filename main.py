@@ -34,9 +34,9 @@ def encode_plugin_info(k, plugin)->str:
 
 def main():
     import gradio as gr
-    if gr.__version__ not in ['3.32.9', '3.32.10', '3.32.11']:
+    if gr.__version__ not in ['3.32.12']:
         raise ModuleNotFoundError("使用项目内置Gradio获取最优体验! 请运行 `pip install -r requirements.txt` 指令安装内置Gradio及其他依赖, 详情信息见requirements.txt.")
-    
+
     # 一些基础工具
     from toolbox import format_io, find_free_port, on_file_uploaded, on_report_generated, get_conf, ArgsGeneralWrapper, DummyWith
 
@@ -57,8 +57,8 @@ def main():
     # 如果WEB_PORT是-1, 则随机选取WEB端口
     PORT = find_free_port() if WEB_PORT <= 0 else WEB_PORT
     from check_proxy import get_current_version
-    from themes.theme import adjust_theme, advanced_css, theme_declaration, js_code_clear, js_code_reset, js_code_show_or_hide, js_code_show_or_hide_group2
-    from themes.theme import js_code_for_toggle_darkmode, js_code_for_persistent_cookie_init
+    from themes.theme import adjust_theme, advanced_css, theme_declaration, js_code_clear, js_code_show_or_hide, js_code_show_or_hide_group2
+    from themes.theme import js_code_for_toggle_darkmode
     from themes.theme import load_dynamic_theme, to_cookie_str, from_cookie_str, assign_user_uuid
     title_html = f"<h1 align=\"center\">GPT 学术优化 {get_current_version()}</h1>{theme_declaration}"
 
@@ -68,7 +68,7 @@ def main():
     functional = get_core_functions()
 
     # 高级函数插件
-    from crazy_functional import get_crazy_functions
+    from crazy_functional import get_crazy_functions, get_multiplex_button_functions
     DEFAULT_FN_GROUPS = get_conf('DEFAULT_FN_GROUPS')
     plugins = get_crazy_functions()
     all_plugin_groups = list(set([g for _, plugin in plugins.items() for g in plugin['Group'].split('|')]))
@@ -106,7 +106,7 @@ def main():
             with gr_L2(scale=2, elem_id="gpt-chat"):
                 chatbot = gr.Chatbot(label=f"当前模型：{LLM_MODEL}", elem_id="gpt-chatbot")
                 if LAYOUT == "TOP-DOWN":  chatbot.style(height=CHATBOT_HEIGHT)
-                history, history_cache, history_cache_update = make_history_cache() # 定义 后端state（history）、前端（history_cache）、后端setter（history_cache_update）三兄弟
+                history, _, _ = make_history_cache() # 定义 后端state（history）、前端（history_cache）、后端setter（history_cache_update）三兄弟
             with gr_L2(scale=1, elem_id="gpt-panel"):
                 with gr.Accordion("输入区", open=True, elem_id="input-panel") as area_input_primary:
                     with gr.Row():
@@ -114,12 +114,7 @@ def main():
                     with gr.Row(elem_id="gpt-submit-row"):
                         multiplex_submit_btn = gr.Button("提交", elem_id="elem_submit_visible", variant="primary")
                         multiplex_sel = gr.Dropdown(
-                            choices=[
-                                "常规对话", 
-                                "多模型对话", 
-                                "智能召回 RAG",
-                                # "智能上下文", 
-                            ], value="常规对话",
+                            choices=get_multiplex_button_functions().keys(), value="常规对话",
                             interactive=True, label='', show_label=False,
                             elem_classes='normal_mut_select', elem_id="gpt-submit-dropdown").style(container=False)
                         submit_btn = gr.Button("提交", elem_id="elem_submit", variant="primary", visible=False)
@@ -179,6 +174,7 @@ def main():
                         with gr.Accordion("点击展开“文件下载区”。", open=False) as area_file_up:
                             file_upload = gr.Files(label="任何文件, 推荐上传压缩文件(zip, tar)", file_count="multiple", elem_id="elem_upload")
 
+
         # 左上角工具栏定义
         from themes.gui_toolbar import define_gui_toolbar
         checkboxes, checkboxes_2, max_length_sl, theme_dropdown, system_prompt, file_upload_2, md_dropdown, top_p, temperature = \
@@ -188,6 +184,9 @@ def main():
         from themes.gui_floating_menu import define_gui_floating_menu
         area_input_secondary, txt2, area_customize, _, resetBtn2, clearBtn2, stopBtn2 = \
             define_gui_floating_menu(customize_btns, functional, predefined_btns, cookies, web_cookie_cache)
+        
+        # 浮动时间线定义
+        gr.Spark()
 
         # 插件二级菜单的实现
         from themes.gui_advanced_plugin_class import define_gui_advanced_plugin_class
@@ -227,11 +226,11 @@ def main():
         multiplex_sel.select(
             None, [multiplex_sel], None, _js=f"""(multiplex_sel)=>run_multiplex_shift(multiplex_sel)""")
         cancel_handles.append(submit_btn.click(**predict_args))
-        resetBtn.click(None, None, [chatbot, history, status], _js=js_code_reset)   # 先在前端快速清除chatbot&status
-        resetBtn2.click(None, None, [chatbot, history, status], _js=js_code_reset)  # 先在前端快速清除chatbot&status
-        reset_server_side_args = (lambda history: ([], [], "已重置", json.dumps(history)), [history], [chatbot, history, status, history_cache])
-        resetBtn.click(*reset_server_side_args)    # 再在后端清除history，把history转存history_cache备用
-        resetBtn2.click(*reset_server_side_args)   # 再在后端清除history，把history转存history_cache备用
+        resetBtn.click(None, None, [chatbot, history, status], _js="""(a,b,c)=>clear_conversation(a,b,c)""")   # 先在前端快速清除chatbot&status
+        resetBtn2.click(None, None, [chatbot, history, status], _js="""(a,b,c)=>clear_conversation(a,b,c)""")  # 先在前端快速清除chatbot&status
+        # reset_server_side_args = (lambda history: ([], [], "已重置"), [history], [chatbot, history, status])
+        # resetBtn.click(*reset_server_side_args)    # 再在后端清除history
+        # resetBtn2.click(*reset_server_side_args)   # 再在后端清除history
         clearBtn.click(None, None, [txt, txt2], _js=js_code_clear)
         clearBtn2.click(None, None, [txt, txt2], _js=js_code_clear)
         if AUTO_CLEAR_TXT:
@@ -331,7 +330,7 @@ def main():
         from shared_utils.cookie_manager import load_web_cookie_cache__fn_builder
         load_web_cookie_cache = load_web_cookie_cache__fn_builder(customize_btns, cookies, predefined_btns)
         app_block.load(load_web_cookie_cache, inputs = [web_cookie_cache, cookies],
-            outputs = [web_cookie_cache, cookies, *customize_btns.values(), *predefined_btns.values()], _js=js_code_for_persistent_cookie_init)
+            outputs = [web_cookie_cache, cookies, *customize_btns.values(), *predefined_btns.values()], _js="""persistent_cookie_init""")
         app_block.load(None, inputs=[], outputs=None, _js=f"""()=>GptAcademicJavaScriptInit("{DARK_MODE}","{INIT_SYS_PROMPT}","{ADD_WAIFU}","{LAYOUT}","{TTS_TYPE}")""")    # 配置暗色主题或亮色主题
         app_block.load(None, inputs=[], outputs=None, _js="""()=>{REP}""".replace("REP", register_advanced_plugin_init_arr))
 

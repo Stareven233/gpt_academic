@@ -3,7 +3,7 @@ import re
 import shutil
 import numpy as np
 from loguru import logger
-from toolbox import update_ui, update_ui_lastest_msg, get_log_folder
+from toolbox import update_ui, update_ui_lastest_msg, get_log_folder, gen_time_str
 from toolbox import get_conf, promote_file_to_downloadzone
 from crazy_functions.latex_fns.latex_toolbox import PRESERVE, TRANSFORM
 from crazy_functions.latex_fns.latex_toolbox import set_forbidden_text, set_forbidden_text_begin_end, set_forbidden_text_careful_brace
@@ -303,7 +303,8 @@ def Latex精细分解与转化(file_manifest, project_folder, llm_kwargs, plugin
     write_html(pfg.sp_file_contents, pfg.sp_file_result, chatbot=chatbot, project_folder=project_folder)
 
     #  <-------- 写出文件 ---------->
-    msg = f"当前大语言模型: {llm_kwargs['llm_model']}，当前语言模型温度设定: {llm_kwargs['temperature']}。"
+    model_name = llm_kwargs['llm_model'].replace('_', '\\_')  # 替换LLM模型名称中的下划线为转义字符
+    msg = f"当前大语言模型: {model_name}，当前语言模型温度设定: {llm_kwargs['temperature']}。"
     final_tex = lps.merge_result(pfg.file_result, mode, msg)
     objdump((lps, pfg.file_result, mode, msg), file=pj(project_folder,'merge_result.pkl'))
 
@@ -354,6 +355,41 @@ def 编译Latex(chatbot, history, main_file_original, main_file_modified, work_f
     chatbot.append([f"正在编译PDF文档", f'编译已经开始。当前工作路径为{work_folder}，如果程序停顿5分钟以上，请直接去该路径下取回翻译结果，或者重启之后再度尝试 ...']); yield from update_ui(chatbot=chatbot, history=history)
     chatbot.append([f"正在编译PDF文档", '...']); yield from update_ui(chatbot=chatbot, history=history); time.sleep(1); chatbot[-1] = list(chatbot[-1]) # 刷新界面
     yield from update_ui_lastest_msg('编译已经开始...', chatbot, history)   # 刷新Gradio前端界面
+    # 检查是否需要使用xelatex
+    def check_if_need_xelatex(tex_path):
+        try:
+            with open(tex_path, 'r', encoding='utf-8', errors='replace') as f:
+                content = f.read(5000)
+                # 检查是否有使用xelatex的宏包
+                need_xelatex = any(
+                    pkg in content 
+                    for pkg in ['fontspec', 'xeCJK', 'xetex', 'unicode-math', 'xltxtra', 'xunicode']
+                )
+                if need_xelatex:
+                    logger.info(f"检测到宏包需要xelatex编译, 切换至xelatex编译")
+                else:
+                    logger.info(f"未检测到宏包需要xelatex编译, 使用pdflatex编译")
+                return need_xelatex
+        except Exception:
+            return False
+
+    # 根据编译器类型返回编译命令
+    def get_compile_command(compiler, filename):
+        compile_command = f'{compiler} -interaction=batchmode -file-line-error {filename}.tex'
+        logger.info('Latex 编译指令: ', compile_command)
+        return compile_command
+
+    # 确定使用的编译器
+    compiler = 'pdflatex'
+    if check_if_need_xelatex(pj(work_folder_modified, f'{main_file_modified}.tex')):
+        logger.info("检测到宏包需要xelatex编译，切换至xelatex编译")
+        # Check if xelatex is installed
+        try:
+            import subprocess
+            subprocess.run(['xelatex', '--version'], capture_output=True, check=True)
+            compiler = 'xelatex'
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            raise RuntimeError("检测到需要使用xelatex编译，但系统中未安装xelatex。请先安装texlive或其他提供xelatex的LaTeX发行版。")
 
     while True:
         import os
@@ -364,10 +400,10 @@ def 编译Latex(chatbot, history, main_file_original, main_file_modified, work_f
 
         # https://stackoverflow.com/questions/738755/dont-make-me-manually-abort-a-latex-compile-when-theres-an-error
         yield from update_ui_lastest_msg(f'尝试第 {n_fix}/{max_try} 次编译, 编译原始PDF ...', chatbot, history)   # 刷新Gradio前端界面
-        ok = compile_latex_with_timeout(f'pdflatex -interaction=batchmode -file-line-error {main_file_original}.tex', work_folder_original)
+        ok = compile_latex_with_timeout(get_compile_command(compiler, main_file_original), work_folder_original)
 
         yield from update_ui_lastest_msg(f'尝试第 {n_fix}/{max_try} 次编译, 编译转化后的PDF ...', chatbot, history)   # 刷新Gradio前端界面
-        ok = compile_latex_with_timeout(f'pdflatex -interaction=batchmode -file-line-error {main_file_modified}.tex', work_folder_modified)
+        ok = compile_latex_with_timeout(get_compile_command(compiler, main_file_modified), work_folder_modified)
 
         if ok and os.path.exists(pj(work_folder_modified, f'{main_file_modified}.pdf')):
             # 只有第二步成功，才能继续下面的步骤
@@ -378,10 +414,10 @@ def 编译Latex(chatbot, history, main_file_original, main_file_modified, work_f
                 ok = compile_latex_with_timeout(f'bibtex  {main_file_modified}.aux', work_folder_modified)
 
             yield from update_ui_lastest_msg(f'尝试第 {n_fix}/{max_try} 次编译, 编译文献交叉引用 ...', chatbot, history)  # 刷新Gradio前端界面
-            ok = compile_latex_with_timeout(f'pdflatex -interaction=batchmode -file-line-error {main_file_original}.tex', work_folder_original)
-            ok = compile_latex_with_timeout(f'pdflatex -interaction=batchmode -file-line-error {main_file_modified}.tex', work_folder_modified)
-            ok = compile_latex_with_timeout(f'pdflatex -interaction=batchmode -file-line-error {main_file_original}.tex', work_folder_original)
-            ok = compile_latex_with_timeout(f'pdflatex -interaction=batchmode -file-line-error {main_file_modified}.tex', work_folder_modified)
+            ok = compile_latex_with_timeout(get_compile_command(compiler, main_file_original), work_folder_original)
+            ok = compile_latex_with_timeout(get_compile_command(compiler, main_file_modified), work_folder_modified)
+            ok = compile_latex_with_timeout(get_compile_command(compiler, main_file_original), work_folder_original)
+            ok = compile_latex_with_timeout(get_compile_command(compiler, main_file_modified), work_folder_modified)
 
             if mode!='translate_zh':
                 yield from update_ui_lastest_msg(f'尝试第 {n_fix}/{max_try} 次编译, 使用latexdiff生成论文转化前后对比 ...', chatbot, history) # 刷新Gradio前端界面
@@ -389,10 +425,10 @@ def 编译Latex(chatbot, history, main_file_original, main_file_modified, work_f
                 ok = compile_latex_with_timeout(f'latexdiff --encoding=utf8 --append-safecmd=subfile {work_folder_original}/{main_file_original}.tex  {work_folder_modified}/{main_file_modified}.tex --flatten > {work_folder}/merge_diff.tex', os.getcwd())
 
                 yield from update_ui_lastest_msg(f'尝试第 {n_fix}/{max_try} 次编译, 正在编译对比PDF ...', chatbot, history)   # 刷新Gradio前端界面
-                ok = compile_latex_with_timeout(f'pdflatex  -interaction=batchmode -file-line-error merge_diff.tex', work_folder)
+                ok = compile_latex_with_timeout(get_compile_command(compiler, 'merge_diff'), work_folder)
                 ok = compile_latex_with_timeout(f'bibtex    merge_diff.aux', work_folder)
-                ok = compile_latex_with_timeout(f'pdflatex  -interaction=batchmode -file-line-error merge_diff.tex', work_folder)
-                ok = compile_latex_with_timeout(f'pdflatex  -interaction=batchmode -file-line-error merge_diff.tex', work_folder)
+                ok = compile_latex_with_timeout(get_compile_command(compiler, 'merge_diff'), work_folder)
+                ok = compile_latex_with_timeout(get_compile_command(compiler, 'merge_diff'), work_folder)
 
         # <---------- 检查结果 ----------->
         results_ = ""
@@ -471,3 +507,70 @@ def write_html(sp_file_contents, sp_file_result, chatbot, project_folder):
     except:
         from toolbox import trimmed_format_exc
         logger.error('writing html result failed:', trimmed_format_exc())
+
+
+def upload_to_gptac_cloud_if_user_allow(chatbot, arxiv_id):
+    try:
+        # 如果用户允许，我们将arxiv论文PDF上传到GPTAC学术云
+        from toolbox import map_file_to_sha256
+        # 检查是否顺利，如果没有生成预期的文件，则跳过
+        is_result_good = False
+        for file_path in chatbot._cookies.get("files_to_promote", []):
+            if file_path.endswith('translate_zh.pdf'):
+                is_result_good = True
+        if not is_result_good:
+            return
+        # 上传文件
+        for file_path in chatbot._cookies.get("files_to_promote", []):
+            align_name = None
+            # normalized name
+            for name in ['translate_zh.pdf', 'comparison.pdf']:
+                if file_path.endswith(name): align_name = name
+            # if match any align name
+            if align_name:
+                logger.info(f'Uploading to GPTAC cloud as the user has set `allow_cloud_io`: {file_path}')
+                with open(file_path, 'rb') as f:
+                    import requests
+                    url = 'https://cloud-2.agent-matrix.com/arxiv_tf_paper_normal_upload'
+                    files = {'file': (align_name, f, 'application/octet-stream')}
+                    data = {
+                        'arxiv_id': arxiv_id,
+                        'file_hash': map_file_to_sha256(file_path),
+                        'language': 'zh',
+                        'trans_prompt': 'to_be_implemented',
+                        'llm_model': 'to_be_implemented',
+                        'llm_model_param': 'to_be_implemented',
+                    }
+                    resp = requests.post(url=url, files=files, data=data, timeout=30)
+                logger.info(f'Uploading terminate ({resp.status_code})`: {file_path}')
+    except:
+        # 如果上传失败，不会中断程序，因为这是次要功能
+        pass
+
+def check_gptac_cloud(arxiv_id, chatbot):
+    import requests
+    success = False
+    downloaded = []
+    try:
+        for pdf_target in ['translate_zh.pdf', 'comparison.pdf']:
+            url = 'https://cloud-2.agent-matrix.com/arxiv_tf_paper_normal_exist'
+            data = {
+                'arxiv_id': arxiv_id,
+                'name': pdf_target,
+            }
+            resp = requests.post(url=url, data=data)
+            cache_hit_result = resp.text.strip('"')
+            if cache_hit_result.startswith("http"):
+                url = cache_hit_result
+                logger.info(f'Downloading from GPTAC cloud: {url}')
+                resp = requests.get(url=url, timeout=30)
+                target = os.path.join(get_log_folder(plugin_name='gptac_cloud'), gen_time_str(), pdf_target)
+                os.makedirs(os.path.dirname(target), exist_ok=True)
+                with open(target, 'wb') as f:
+                    f.write(resp.content)
+                new_path = promote_file_to_downloadzone(target, chatbot=chatbot)
+                success = True
+                downloaded.append(new_path)
+    except:
+        pass
+    return success, downloaded
