@@ -9,7 +9,7 @@ import os, sys
 if __name__ == "__main__":
     from test_utils import plugin_test
 
-    plugin_test(plugin='crazy_functions.SourceCode_Comment->注释Python项目', main_input="build/test/python_comment")
+    plugin_test(plugin='crazy_functions.VideoResource_GPT->多媒体任务', main_input="我想找一首歌，里面有句歌词是“turn your face towards the sun”")
 
     # plugin_test(plugin='crazy_functions.Internet_GPT->连接网络回答问题', main_input="谁是应急食品？")
 
