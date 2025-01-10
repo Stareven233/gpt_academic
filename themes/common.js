@@ -392,7 +392,8 @@ function chatbotContentChanged(attempt = 1, force = false) {
                 // Now pass both the message element and the is_last_in_arr boolean to addCopyButton
                 addCopyButton(message, index, is_last_in_arr);
 
-                save_conversation_history();
+                // save_conversation_history
+                save_conversation_history_slow_down();
             });
             // gradioApp().querySelectorAll('#gpt-chatbot .message-wrap .message.bot').forEach(addCopyButton);
         }, i === 0 ? 0 : 200);
@@ -938,19 +939,36 @@ function gpt_academic_gradio_saveload(
     }
 }
 
+function generateUUID() {
+    // Generate a random number and convert it to a hexadecimal string
+    function randomHexDigit() {
+        return Math.floor((1 + Math.random()) * 0x10000).toString(16).slice(1);
+    }
+
+    // Construct the UUID using the randomHexDigit function
+    return (
+        randomHexDigit() + randomHexDigit() + '-' +
+        randomHexDigit() + '-' +
+        '4' + randomHexDigit().slice(0, 3) + '-' + // Version 4 UUID
+        ((Math.floor(Math.random() * 4) + 8).toString(16)) + randomHexDigit().slice(0, 3) + '-' +
+        randomHexDigit() + randomHexDigit() + randomHexDigit()
+    );
+}
+
 function update_conversation_metadata() {
     // Create a conversation UUID and timestamp
-    const conversationId = crypto.randomUUID();
-    const timestamp = new Date().toISOString();
-    const conversationData = {
-        id: conversationId,
-        timestamp: timestamp
-    };
-    // Save to cookie
-    setCookie("conversation_metadata", JSON.stringify(conversationData), 2);
-    // read from cookie
-    let conversation_metadata = getCookie("conversation_metadata");
-    // console.log("conversation_metadata", conversation_metadata);
+    try {
+        const conversationId = generateUUID();
+        console.log('Create conversation ID:', conversationId);
+        const timestamp = new Date().toISOString();
+        const conversationMetaData = {
+            id: conversationId,
+            timestamp: timestamp
+        };
+        localStorage.setItem("conversation_metadata", JSON.stringify(conversationMetaData));
+    } catch (e) {
+        console.error('Error in updating conversation metadata:', e);
+    }
 }
 
 
@@ -966,20 +984,26 @@ function generatePreview(conversation, timestamp, maxLength = 100) {
 }
 
 async function save_conversation_history() {
-    // 505030475
+
     let chatbot = await get_data_from_gradio_component('gpt-chatbot');
     let history = await get_data_from_gradio_component('history-ng');
-    let conversation_metadata = getCookie("conversation_metadata");
-    conversation_metadata = JSON.parse(conversation_metadata);
-    // console.log("conversation_metadata", conversation_metadata);
-    let conversation = {
-        timestamp: conversation_metadata.timestamp,
-        id: conversation_metadata.id,
-        metadata: conversation_metadata,
-        conversation: chatbot,
-        history: history,
-        preview: generatePreview(JSON.parse(history), conversation_metadata.timestamp)
-    };
+    let conversation = {};
+    let conversation_metadata = localStorage.getItem("conversation_metadata");
+    try {
+        conversation_metadata = JSON.parse(conversation_metadata);
+        conversation = {
+            timestamp: conversation_metadata.timestamp,
+            id: conversation_metadata.id,
+            metadata: conversation_metadata,
+            conversation: chatbot,
+            history: history,
+            preview: generatePreview(JSON.parse(history), conversation_metadata.timestamp)
+        };
+    } catch (e) {
+        // console.error('Conversation metadata parse error, recreate conversation metadata');
+        update_conversation_metadata();
+        return;
+    }
 
     // Get existing conversation history from local storage
     let conversation_history = [];
@@ -1010,6 +1034,13 @@ async function save_conversation_history() {
         return timeB - timeA;
     });
 
+    const max_chat_preserve = 10;
+
+    if (conversation_history.length >= max_chat_preserve + 1) {
+        toast_push('对话时间线记录已满，正在移除最早的对话记录。您也可以点击左侧的记录点进行手动清理。', 3000);
+        conversation_history = conversation_history.slice(0, max_chat_preserve);
+    }
+
     // Save back to local storage
     try {
         localStorage.setItem('conversation_history', JSON.stringify(conversation_history));
@@ -1024,58 +1055,32 @@ async function save_conversation_history() {
     }
 }
 
+save_conversation_history_slow_down = do_something_but_not_too_frequently(300, save_conversation_history);
 
 function restore_chat_from_local_storage(event) {
     let conversation = event.detail;
     push_data_to_gradio_component(conversation.conversation, "gpt-chatbot", "obj");
     push_data_to_gradio_component(conversation.history, "history-ng", "obj");
-    // console.log("restore_chat_from_local_storage", conversation);
-
-    // Create a conversation UUID and timestamp
     const conversationId = conversation.id;
     const timestamp = conversation.timestamp;
     const conversationData = {
         id: conversationId,
         timestamp: timestamp
     };
-    // Save to cookie
-    setCookie("conversation_metadata", JSON.stringify(conversationData), 2);
-    // read from cookie
-    let conversation_metadata = getCookie("conversation_metadata");
-
+    localStorage.setItem("conversation_metadata", JSON.stringify(conversationData));
 }
 
-
-function clear_conversation(a, b, c) {
+async function clear_conversation(a, b, c) {
+    await save_conversation_history();
     update_conversation_metadata();
     let stopButton = document.getElementById("elem_stop");
     stopButton.click();
-    // console.log("clear_conversation");
     return reset_conversation(a, b);
 }
 
 
 function reset_conversation(a, b) {
-    // console.log("js_code_reset");
-    a = btoa(unescape(encodeURIComponent(JSON.stringify(a))));
-    setCookie("js_previous_chat_cookie", a, 1);
-    b = btoa(unescape(encodeURIComponent(JSON.stringify(b))));
-    setCookie("js_previous_history_cookie", b, 1);
-    // gen_restore_btn();
     return [[], [], "已重置"];
-}
-
-
-// clear -> 将 history 缓存至 history_cache -> 点击复原 -> restore_previous_chat() -> 触发elem_update_history -> 读取 history_cache
-function restore_previous_chat() {
-    // console.log("restore_previous_chat");
-    let chat = getCookie("js_previous_chat_cookie");
-    chat = JSON.parse(decodeURIComponent(escape(atob(chat))));
-    push_data_to_gradio_component(chat, "gpt-chatbot", "obj");
-    let history = getCookie("js_previous_history_cookie");
-    history = JSON.parse(decodeURIComponent(escape(atob(history))));
-    push_data_to_gradio_component(history, "history-ng", "obj");
-    // document.querySelector("#elem_update_history").click(); // in order to call set_history_gr_state, and send history state to server
 }
 
 

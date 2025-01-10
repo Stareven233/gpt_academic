@@ -1,4 +1,4 @@
-import os, json; os.environ['no_proxy'] = '*' # 避免代理网络产生意外污染
+import os; os.environ['no_proxy'] = '*' # 避免代理网络产生意外污染
 
 help_menu_description = \
 """Github源代码开源和更新[地址🚀](https://github.com/binary-husky/gpt_academic),
@@ -226,8 +226,8 @@ def main():
         multiplex_sel.select(
             None, [multiplex_sel], None, _js=f"""(multiplex_sel)=>run_multiplex_shift(multiplex_sel)""")
         cancel_handles.append(submit_btn.click(**predict_args))
-        resetBtn.click(None, None, [chatbot, history, status], _js="""(a,b,c)=>clear_conversation(a,b,c)""")   # 先在前端快速清除chatbot&status
-        resetBtn2.click(None, None, [chatbot, history, status], _js="""(a,b,c)=>clear_conversation(a,b,c)""")  # 先在前端快速清除chatbot&status
+        resetBtn.click(None, None, [chatbot, history, status], _js= """clear_conversation""")   # 先在前端快速清除chatbot&status
+        resetBtn2.click(None, None, [chatbot, history, status], _js="""clear_conversation""")  # 先在前端快速清除chatbot&status
         # reset_server_side_args = (lambda history: ([], [], "已重置"), [history], [chatbot, history, status])
         # resetBtn.click(*reset_server_side_args)    # 再在后端清除history
         # resetBtn2.click(*reset_server_side_args)   # 再在后端清除history
