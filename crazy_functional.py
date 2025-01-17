@@ -112,7 +112,7 @@ def get_crazy_functions():
         "Arxiv论文翻译": {
             "Group": "学术",
             "Color": "stop",
-            "AsButton": True,
+            "AsButton": False,
             "Info": "Arixv论文精细翻译 | 输入参数arxiv论文的ID，比如1812.10695",
             "Function": HotReload(Latex翻译中文并重新编译PDF),  # 当注册Class后，Function旧接口仅会在“虚空终端”中起作用
             "Class": Arxiv_Localize,    # 新一代插件需要注册Class
@@ -258,7 +258,7 @@ def get_crazy_functions():
         "精准翻译PDF论文": {
             "Group": "学术",
             "Color": "stop",
-            "AsButton": True,
+            "AsButton": False,
             "Info": "精准翻译PDF论文为中文 | 输入参数为路径",
             "Function": HotReload(批量翻译PDF文档), # 当注册Class后，Function旧接口仅会在“虚空终端”中起作用
             "Class": PDF_Tran,  # 新一代插件需要注册Class
@@ -359,7 +359,7 @@ def get_crazy_functions():
         "📚本地Latex论文精细翻译（上传Latex项目）[需Latex]": {
             "Group": "学术",
             "Color": "stop",
-            "AsButton": False,
+            "AsButton": True,
             "AdvancedArgs": True,
             "ArgsReminder": r"如果有必要, 请在此处给出自定义翻译命令, 解决部分词汇翻译不准确的问题。 "
                             r"例如当单词'agent'翻译不准确时, 请尝试把以下指令复制到高级参数区: "
@@ -570,7 +570,7 @@ def get_crazy_functions():
                 "构建知识库（先上传文件素材,再运行此插件）": {
                     "Group": "对话",
                     "Color": "stop",
-                    "AsButton": False,
+                    "AsButton": True,
                     "AdvancedArgs": True,
                     "ArgsReminder": "此处待注入的知识库名称id, 默认为default。文件进入知识库后可长期保存。可以通过再次调用本插件的方式，向知识库追加更多文档。",
                     "Function": HotReload(知识库文件注入),

@@ -89,7 +89,7 @@ def get_core_functions():
         },
 
 
-        "中译英": {
+        "To English": {
             "Prefix":   r"Please translate following sentence to English:" + "\n\n",
             "Suffix":   r"",
         },
