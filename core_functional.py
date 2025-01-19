@@ -3,6 +3,7 @@
 # 'stop' 颜色对应 theme.py 中的 color_er
 import importlib
 from toolbox import clear_line_break
+from toolbox import resolve_vision_message
 from toolbox import apply_gpt_academic_string_mask_langbased
 from toolbox import build_gpt_academic_masked_string_langbased
 from textwrap import dedent
@@ -143,7 +144,16 @@ def get_core_functions():
                         r"Items need to be transformed:" + "\n\n",
             "Visible":  False,
             "Suffix":   r"",
-        }
+        },
+
+
+        "图片问答": {
+            "Prefix":   r"",
+            "Suffix":   r"",
+            "Visible":  True,
+            "AutoClearHistory": True,
+            "PreProcess": resolve_vision_message,
+        },
     }
 
 
@@ -158,15 +168,17 @@ def handle_core_functionality(additional_fn, inputs, history, chatbot):
         return inputs, history
     else:
         # 预制功能
-        if "PreProcess" in core_functional[additional_fn]:
-            if core_functional[additional_fn]["PreProcess"] is not None:
-                inputs = core_functional[additional_fn]["PreProcess"](inputs)  # 获取预处理函数（如果有的话）
+        func = core_functional[additional_fn]
+        if "PreProcess" in func:
+            if func["PreProcess"] is not None:
+                inputs = func["PreProcess"](inputs)  # 获取预处理函数（如果有的话）
         # 为字符串加上上面定义的前缀和后缀。
-        inputs = apply_gpt_academic_string_mask_langbased(
-            string = core_functional[additional_fn]["Prefix"] + inputs + core_functional[additional_fn]["Suffix"],
-            lang_reference = inputs,
-        )
-        if core_functional[additional_fn].get("AutoClearHistory", False):
+        if func["Prefix"] or func["Suffix"]:
+            inputs = apply_gpt_academic_string_mask_langbased(
+                string = func["Prefix"] + inputs + func["Suffix"],
+                lang_reference = inputs,
+            )
+        if func.get("AutoClearHistory", False):
             history = []
         return inputs, history
 

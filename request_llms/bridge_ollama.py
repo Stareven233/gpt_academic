@@ -133,7 +133,11 @@ def predict(inputs, llm_kwargs, plugin_kwargs, chatbot, history=[], system_promp
         from core_functional import handle_core_functionality
         inputs, history = handle_core_functionality(additional_fn, inputs, history, chatbot)
 
-    raw_input = inputs
+    if isinstance(inputs, dict):
+        raw_input = inputs.copy()
+        raw_input['images'] = [f'<base64> {b64[:10]}...' for b64 in inputs['images']]
+    else:
+        raw_input = inputs
     logger.info(f'[raw_input] {raw_input}')
     chatbot.append((inputs, ""))
     yield from update_ui(chatbot=chatbot, history=history, msg="等待响应") # 刷新界面
@@ -149,7 +153,8 @@ def predict(inputs, llm_kwargs, plugin_kwargs, chatbot, history=[], system_promp
     from .bridge_all import model_info
     endpoint = model_info[llm_kwargs['llm_model']]['endpoint']
 
-    history.append(inputs); history.append("")
+    history.append(inputs)
+    history.append("")
 
     retry = 0
     if proxies is not None:
@@ -255,7 +260,11 @@ def generate_payload(inputs, llm_kwargs, history, system_prompt, stream):
 
     what_i_ask_now = {}
     what_i_ask_now["role"] = "user"
-    what_i_ask_now["content"] = inputs
+    if isinstance(inputs, dict):
+        # 默认符合ollama的message格式 https://ollama.com/library/llama3.2-vision
+        what_i_ask_now.update(inputs)
+    else:
+        what_i_ask_now["content"] = inputs
     messages.append(what_i_ask_now)
     model = llm_kwargs['llm_model']
     if model.startswith('ollama@'):

@@ -8,6 +8,7 @@ import base64
 import gradio
 import shutil
 import glob
+from pathlib import Path
 import json
 import uuid
 from loguru import logger
@@ -642,8 +643,36 @@ def load_chat_cookies():
 def clear_line_break(txt):
     txt = txt.replace("\n", " ")
     txt = txt.replace("  ", " ")
-    txt = txt.replace("  ", " ")
     return txt
+
+
+def resolve_vision_message(txt: str):
+    # https://ollama.com/library/llama3.2-vision
+    '''messages=[{
+            'role': 'user',
+            'content': 'What is in this image?',
+            'images': ['<base64-encoded image data>']
+        }]
+    '''
+    t = txt.split('\n', 1)
+    uploaded_dir = t[0]
+    if len(t) == 2:
+        prompt = t[1]
+    else:
+        prompt = '请描述提供的图片的内容'
+    images = []
+    for p in Path(uploaded_dir).iterdir():
+        if not p.suffix.lower() in {'.png', '.jpg', '.jpeg', '.bmp', '.gif'}:
+            continue
+    with p.open("rb") as f:
+        t = base64.b64encode(f.read()).decode('utf-8')
+        images.append(t)
+    t = dict(
+        content=prompt,
+        images=images,
+    )
+    # print(t)
+    return t
 
 
 class DummyWith:

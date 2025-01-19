@@ -501,6 +501,9 @@ def format_io(self, y):
     if y is None or y == []:
         return []
     i_ask, gpt_reply = y[-1]
+    if isinstance(i_ask, dict):
+        # TODO 应该连图片也一起渲染，不过上传时能看到图片就先这样吧
+        i_ask = i_ask['content']
     i_ask = apply_gpt_academic_string_mask(i_ask, mode="show_render")
     gpt_reply = apply_gpt_academic_string_mask(gpt_reply, mode="show_render")
     # 当代码输出半截的时候，试着补上后个```
