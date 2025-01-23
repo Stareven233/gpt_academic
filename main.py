@@ -15,7 +15,7 @@ help_menu_description = \
 
 from loguru import logger
 def enable_log(PATH_LOGGING):
-    from shared_utils.logging import setup_logging
+    from shared_utils.loggingx import setup_logging
     setup_logging(PATH_LOGGING)
 
 def encode_plugin_info(k, plugin)->str:

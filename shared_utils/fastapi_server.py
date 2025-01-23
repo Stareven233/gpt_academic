@@ -46,6 +46,7 @@ queue cocurrent effectiveness
 
 import os, requests, threading, time
 import uvicorn
+# from shared_utils import init
 
 def validate_path_safety(path_or_url, user):
     from toolbox import get_conf, default_user_name
@@ -107,10 +108,9 @@ class Server(uvicorn.Server):
 
 
 def start_app(app_block, CONCURRENT_COUNT, AUTHENTICATION, PORT, SSL_KEYFILE, SSL_CERTFILE):
-    import uvicorn
     import fastapi
-    import gradio as gr
     from fastapi import FastAPI
+    import gradio as gr
     from gradio.routes import App
     from toolbox import get_conf
     CUSTOM_PATH, PATH_LOGGING = get_conf('CUSTOM_PATH', 'PATH_LOGGING')
@@ -282,6 +282,7 @@ def start_app(app_block, CONCURRENT_COUNT, AUTHENTICATION, PORT, SSL_KEYFILE, SS
         port=PORT,
         reload=False,
         log_level="warning",
+        forwarded_allow_ips="*",
         ssl_keyfile=ssl_keyfile,
         ssl_certfile=ssl_certfile,
     )
@@ -297,6 +298,7 @@ def start_app(app_block, CONCURRENT_COUNT, AUTHENTICATION, PORT, SSL_KEYFILE, SS
         path_to_local_server = f"http://{url_host_name}:{PORT}/"
     if CUSTOM_PATH != '/':
         path_to_local_server += CUSTOM_PATH.lstrip('/').rstrip('/') + '/'
+    # server, path_to_local_server = init_uvicorn(fastapi_app, server_name, PORT, ssl_keyfile, ssl_certfile)
     # --- --- begin  --- ---
     server.run_in_thread()
 
@@ -317,6 +319,6 @@ def start_app(app_block, CONCURRENT_COUNT, AUTHENTICATION, PORT, SSL_KEYFILE, SS
         "http": "",
         "https": "",
     }
-    requests.get(f"{app_block.local_url}startup-events", verify=app_block.ssl_verify, proxies=forbid_proxies)
+    requests.get(f"{app_block.local_url.replace('0.0.0.0', 'localhost')}startup-events", verify=app_block.ssl_verify, proxies=forbid_proxies)
     app_block.is_running = True
     app_block.block_thread()

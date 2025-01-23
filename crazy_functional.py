@@ -347,7 +347,7 @@ def get_crazy_functions():
         "📚Arxiv论文精细翻译（输入arxivID）[需Latex]": {
             "Group": "学术",
             "Color": "stop",
-            "AsButton": False,
+            "AsButton": True,
             "AdvancedArgs": True,
             "ArgsReminder": r"如果有必要, 请在此处给出自定义翻译命令, 解决部分词汇翻译不准确的问题。 "
                             r"例如当单词'agent'翻译不准确时, 请尝试把以下指令复制到高级参数区: "
@@ -359,7 +359,7 @@ def get_crazy_functions():
         "📚本地Latex论文精细翻译（上传Latex项目）[需Latex]": {
             "Group": "学术",
             "Color": "stop",
-            "AsButton": True,
+            "AsButton": False,
             "AdvancedArgs": True,
             "ArgsReminder": r"如果有必要, 请在此处给出自定义翻译命令, 解决部分词汇翻译不准确的问题。 "
                             r"例如当单词'agent'翻译不准确时, 请尝试把以下指令复制到高级参数区: "
